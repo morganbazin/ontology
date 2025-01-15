@@ -55,7 +55,7 @@ export type Work = Film | Book | Painting;
 
 const App: React.FC = () => {
   const [works, setWorks] = useState<Work[]>([]);
-  const [selectedWork, setSelectedWork] = useState<Work | null>(null);
+  const [selectedNode, setSelectedNode] = useState<any | null>(null);
   const [data, setData] = useState<IData | null>(null);
 
   const [category, setCategory] = useState<"Work" | "Person">("Work");
@@ -63,6 +63,10 @@ const App: React.FC = () => {
   const [type, setType] = useState<string>("");
 
   const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const handleNodeClick = (node: any) => {
+    setSelectedNode(node); // Mettre à jour le nœud sélectionné
+  };
 
   useEffect(() => {
     axios
@@ -74,7 +78,6 @@ const App: React.FC = () => {
         },
       })
       .then((response) => {
-        console.log(response);
         setData(response.data);
       });
   }, [category, search, type]);
@@ -84,23 +87,18 @@ const App: React.FC = () => {
     const width = 2000;
     const height = 2000;
 
-    // Clear previous SVG content to avoid duplication
     svg.selectAll("*").remove();
-
-    // Create a group to hold all zoomable elements
     const g = svg.append("g");
 
     const links: any[] = [];
     const nodes: any[] = [];
 
-    // Populate links and nodes
     for (const person of data?.persons ?? []) {
       for (const work of data?.works ?? []) {
         if (work.creatorIds.includes(person.id)) {
           links.push({
             source: "person" + person.id,
             target: "work" + work.id,
-            type: "a créé",
           });
         } else if (
           work.type === "Film" &&
@@ -109,7 +107,6 @@ const App: React.FC = () => {
           links.push({
             source: "person" + person.id,
             target: "work" + work.id,
-            type: "a joué dans",
           });
         }
       }
@@ -127,15 +124,11 @@ const App: React.FC = () => {
       nodes.push({ id: "work" + work.id, label: work.title, type: work.type });
     }
 
-    // Define zoom behavior
-    const zoom = d3.zoom().on("zoom", (event) => {
-      g.attr("transform", event.transform); // Apply zoom and pan transformations
-    });
-
-    // Apply zoom behavior to the SVG
+    const zoom = d3
+      .zoom()
+      .on("zoom", (event) => g.attr("transform", event.transform));
     svg.call(zoom);
 
-    // Create simulation
     const simulation = d3
       .forceSimulation(nodes)
       .force(
@@ -148,7 +141,6 @@ const App: React.FC = () => {
       .force("charge", d3.forceManyBody().strength(-300))
       .force("center", d3.forceCenter(width / 2, height / 2));
 
-    // Draw links
     g.append("g")
       .selectAll("line")
       .data(links)
@@ -157,16 +149,15 @@ const App: React.FC = () => {
       .attr("stroke", "#999")
       .attr("stroke-width", 2);
 
-    // Draw nodes
     g.append("g")
       .selectAll("circle")
       .data(nodes)
       .enter()
       .append("circle")
       .attr("r", 10)
-      .attr("fill", (d) => (d.type === "Person" ? "blue" : "green"));
+      .attr("fill", (d) => (d.type === "Person" ? "blue" : "green"))
+      .on("click", (_, d) => handleNodeClick(d)); // Attache les données au clic
 
-    // Draw labels
     g.append("g")
       .selectAll("text")
       .data(nodes)
@@ -176,7 +167,6 @@ const App: React.FC = () => {
       .attr("x", 15)
       .attr("y", 5);
 
-    // Update positions on simulation tick
     simulation.on("tick", () => {
       g.selectAll("line")
         .attr("x1", (d: any) => d.source.x)
@@ -194,60 +184,38 @@ const App: React.FC = () => {
     });
   }, [data]);
 
-  const handleSelectWork = (id: number) => {
-    axios.get(`http://localhost:3001/works/${id}`).then((response) => {
-      setSelectedWork(response.data);
-    });
-  };
-
   return (
-    <div
-      className="App"
-      style={{ fontFamily: "Arial, sans-serif", padding: "20px" }}
-    >
-      <h1>Ontology of Cultural Works</h1>
-      <svg ref={svgRef} width="100%" height="600px"></svg>
-      <h2>List of Works</h2>
-      <ul>
-        {works.map((work) => (
-          <li key={work.id}>
-            <button
-              style={{
-                background: "lightblue",
-                border: "none",
-                padding: "5px",
-                cursor: "pointer",
-              }}
-              onClick={() => handleSelectWork(work.id)}
-            >
-              {work.title}
-            </button>
-          </li>
-        ))}
-      </ul>
-      {selectedWork && (
-        <div
-          style={{
-            marginTop: "20px",
-            padding: "10px",
-            border: "1px solid gray",
-          }}
-        >
-          <h2>Details</h2>
-          <p>
-            <strong>Title:</strong> {selectedWork.title}
+    <div className="bg-white w-full h-full min-h-screen flex">
+      {/* Section gauche : Graphe */}
+      <div className="w-2/3 h-full flex justify-center items-center bg-gray-100 container">
+        <svg ref={svgRef} width="100%" height="100%" />
+      </div>
+
+      {/* Section droite : Détails */}
+      <div className="w-1/3 h-full p-4 bg-white border-l">
+        {selectedNode ? (
+          <div>
+            <h2 className="text-xl font-bold mb-4">{selectedNode.label}</h2>
+            <p>
+              <strong>Type:</strong> {selectedNode.type}
+            </p>
+            {selectedNode.type === "Person" && (
+              <p>
+                <strong>Roles:</strong> {selectedNode.roles?.join(", ")}
+              </p>
+            )}
+            {selectedNode.type === "Work" && (
+              <p>
+                <strong>Genre:</strong> {selectedNode.genre}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-gray-500">
+            Cliquez sur un élément du graphe pour afficher les détails ici.
           </p>
-          <p>
-            <strong>Creator:</strong> {selectedWork.creatorIds.join(", ")}
-          </p>
-          <p>
-            <strong>Type:</strong> {selectedWork.type}
-          </p>
-          <p>
-            <strong>Genre:</strong> {selectedWork.genre}
-          </p>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
