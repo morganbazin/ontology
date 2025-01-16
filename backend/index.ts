@@ -59,10 +59,7 @@ app.get("/search", (req: Request, res: Response) => {
   const category = req.query.category as string;
   const search = req.query.search as string;
   const type = req.query.type as string;
-
-  console.log("category", category, category === "Work", category === "Person");
-  console.log("search", search);
-  console.log("type", type);
+  const role = req.query.role as string;
 
   let resultsPerson: Person[] = [];
   let resultsWork: Work[] = [];
@@ -70,9 +67,16 @@ app.get("/search", (req: Request, res: Response) => {
 
   if (category === "Person") {
     resultsPerson = persons.filter((person) => {
-      return person.name
+      // Filtrer les personnes par nom
+      const matchesSearch = person.name
         .toLowerCase()
         .includes((search as string).toLowerCase());
+      // Filtrer les personnes par rôle
+      const matchesRole =
+        role === "" ||
+        person.roles.some((r) => r.toLowerCase() === role.toLowerCase());
+
+      return matchesSearch && matchesRole;
     });
 
     resultsWork = works.filter((work) => {
@@ -89,7 +93,6 @@ app.get("/search", (req: Request, res: Response) => {
   if (category === "Work") {
     resultsWork = works.filter((work) => {
       let matchesQuery = false;
-      console.log(search, search === "");
       if (search === "") {
         matchesQuery = true;
       } else if (
